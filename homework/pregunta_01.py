@@ -71,3 +71,54 @@ def pregunta_01():
 
 
     """
+    from pathlib import Path
+    import re
+    import pandas as pd
+
+
+    repo_root = Path(__file__).resolve().parent.parent
+    files_dir = repo_root / "files"
+    output_dir = files_dir / "output"
+
+    def encontrar_base_train_test() -> Path:
+        candidatos = [
+            repo_root / "input",       
+            files_dir / "input",
+            files_dir / "input" / "input",
+        ]
+        for base in candidatos:
+            if (base / "train").exists() and (base / "test").exists():
+                return base
+
+        for p in files_dir.rglob("train"):
+            base = p.parent
+            if (base / "test").exists():
+                return base
+        raise FileNotFoundError("No se encontró una carpeta con 'train' y 'test' dentro de 'files/'.")
+
+    base_dir = encontrar_base_train_test()
+
+    def construir_dataset(split: str) -> pd.DataFrame:
+        registros = []
+        for sentimiento in ("negative", "positive", "neutral"):
+            carpeta = base_dir / split / sentimiento
+            if not carpeta.exists():
+                continue
+            for txt in sorted(carpeta.glob("*.txt")):
+                texto = txt.read_text(encoding="utf-8", errors="ignore")
+                texto = re.sub(r"\s+", " ", texto).strip()
+                registros.append({"phrase": texto, "target": sentimiento})
+        return pd.DataFrame(registros, columns=["phrase", "target"])
+
+    train_df = construir_dataset("train")
+    test_df  = construir_dataset("test")
+
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+
+    train_df.to_csv(output_dir / "train_dataset.csv", index=False, encoding="utf-8")
+    test_df.to_csv(output_dir / "test_dataset.csv", index=False, encoding="utf-8")
+
+
+    return
